@@ -1,0 +1,4 @@
+Para compilar utilizar el siguiente comando: mpicc mpi.c -o mpi -lm
+    *El argumento -lm se usa por lo siguiente: If your code includes mathematical functions (like exp, cos, etc.), you need to link to the mathematics library libm.so. This is done, just like for serial compiling, by adding -lm to the end of your compile command, that is,
+Para ejecutar: mpirun -np (numero de procesos) mpi
+Para ejecutar con hostfile: mpirun --hostfile (nombre del hostfile) -np (numero de procesos) mpi

@@ -13,9 +13,8 @@
 #define MASTER 0
 
 struct client{
-    int process;
-    int sleep;
     char priority;
+    int sleep;
 };
 
 struct checkout{
@@ -26,7 +25,7 @@ struct checkout{
 
 void attend_client();
 int check_clients_size(struct checkout* checkouts, int nActive, int attending, int pending, int completed, int size);
-void reset_client(struct client _client);
+void reset_client(struct client* _client);
 void initialize_clients(struct client* _clients);
 
 int main(int argc, char** argv){
@@ -44,8 +43,6 @@ int main(int argc, char** argv){
 
     MPI_Request* request;   //request para saber si se ha recibido un mensaje
     MPI_Status status;      //variable utilizada para conocer quién envió el mensaje
-
-    clock_t clock;
 
     //Inicialización de comunicación
     MPI_Init(NULL,NULL);
@@ -79,6 +76,15 @@ int main(int argc, char** argv){
         for(i=0;i<size-1;i++){
             printf("checkout %d active: %c free: %c\n", i+1, checkouts[i].active?'O':'X', checkouts[i].free?'O':'X');
         }
+        printf("\n\n");
+        
+        for(i=0;i<MAX_CLIENTS;i++){
+            if(clients[i].priority)
+                printf("client %d is prioritary\n", i);
+            else
+                printf("client %d is not prioritary\n", i);
+        }
+
         printf("n process=%d, max_clients in queue=%d, master=%d, checkouts=%d, ", size, MAX_CLIENTS, MASTER, (size-1));
         printf("completed: %d, pending: %d, attending: %d, open: %d\n\n\n",completed, pending, attending, nActive);
         
@@ -87,12 +93,14 @@ int main(int argc, char** argv){
         for(i=0;i<nActive;i++){
             if(checkouts[i].active){
                 nActive=check_clients_size(checkouts, nActive, attending, pending, completed, size);
-                //Se asigna al cliente su caja
-                clients[i].process = i;
                 //Se envia el cliente a la caja
                 MPI_Send(&clients[nAttend],1,MPI_2INT,i,0,MPI_COMM_WORLD);
                 //Gestión de la cola y las cajas
-                printf("Sending client %d to checkout nº %d\n", nAttend+1, i);
+                printf("Sending client %d to checkout nº %d\n", nAttend, i);
+                if (clients[nAttend%MAX_CLIENTS].priority)
+                    printf("Client %d is prioritary\n", nAttend);
+                else
+                    printf("Client %d is not prioritary\n", nAttend);
                 printf("Time remaining for checkout nº %d: %d seconds\n", i, clients[nAttend].sleep);
                 checkouts[i].free = OCCUPIED;
                 pending--;
@@ -124,17 +132,22 @@ int main(int argc, char** argv){
                         completed++;
                         attending--;
                         if(pending>0){
+                            if(nAttend>=MAX_CLIENTS)
+                                reset_client(&clients[nAttend%MAX_CLIENTS]);
                             //Se envia el cliente a la caja
                             MPI_Send(&clients[nAttend%MAX_CLIENTS],1,MPI_2INT,i,0,MPI_COMM_WORLD);
                             //Gestión de la cola y las cajas
-                            printf("Sending client %d to checkout nº %d\n", nAttend+1, status.MPI_SOURCE);
-                            printf("New time remaining for checkout nº %d: %d seconds\n\n", status.MPI_SOURCE, clients[nAttend].sleep);
+                            printf("Sending client %d to checkout nº %d\n", nAttend, status.MPI_SOURCE);
+                            if (clients[nAttend%MAX_CLIENTS].priority)
+                                printf("Client %d is prioritary\n", nAttend);
+                            else
+                                printf("Client %d is not prioritary\n", nAttend);
+                            printf("New time remaining for checkout nº %d: %d seconds\n\n", status.MPI_SOURCE, clients[nAttend%MAX_CLIENTS].sleep);
                             checkouts[i-1].free = OCCUPIED;
                             pending--;
                             attending++;
                             nAttend++;
                             pending++;
-                            reset_client(clients[nAttend%MAX_CLIENTS]);
                             //Función no bloqueante que recibe el resultado de la caja
                             MPI_Irecv(&results, 1, MPI_2INT, i, 0, MPI_COMM_WORLD, &request[i-1]);
                         }
@@ -184,15 +197,24 @@ int check_clients_size(struct checkout* checkouts, int nActive, int attending, i
     return nActive;
 }
 
-void reset_client(struct client _client){
-    _client.priority = rand()%2;
-    _client.sleep?rand()%11+10:rand()%6+5;
+void reset_client(struct client* _client){
+    (*_client).priority = rand()%2;
+    if((*_client).priority){
+        (*_client).sleep=rand()%11+10;
+    }  
+    else{
+        (*_client).sleep=rand()%6+5;
+    }
+        
 }
 
 void initialize_clients(struct client* _clients){
     int i;
     for(i=0;i<MAX_CLIENTS;i++){
         _clients[i].priority = rand() % 2;
-        _clients[i].sleep?rand()%11+10:rand()%6+5;
+        if(_clients[i].priority)
+            _clients[i].sleep=rand()%11+10;
+        else
+            _clients[i].sleep=rand()%6+5;
     }
 }
