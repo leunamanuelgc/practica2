@@ -202,9 +202,6 @@ int main(int argc, char** argv){
     }
 
     //Terminamos la comunicación
-    for(i=1;i<size;i++){
-        MPI_Recv(&results, 1, MPI_2INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
     MPI_Finalize();
 
     return 0;
